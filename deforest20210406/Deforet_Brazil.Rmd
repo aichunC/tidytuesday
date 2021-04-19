@@ -1,0 +1,82 @@
+---
+title: "Deforest--TidyTuesday Week15,2021"
+author: "Twitter @Sky013088 | Email: sky013088@gmail.com "
+date: "4/19/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## step 0: first tidyverse Project Data. 
+
+I am excited to start TidyTuesday project, and joined this online learning community. After looking at the overall dataset for forest loss, I found Brazil has the worse forest loss year over year, so I am curious about what causes this phenomenon. Below I answered the question:  *what are the top 5 reasons for Brazil's forest lost ? * 
+I obtained the data according to the instruction here in < https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-04-06>.
+
+
+
+
+
+
+## step 1: rank the Brazil_loss data 
+
+according the following steps. I would have summed up the total loss from 2001-2013 and rank value. However I decided to use the other method. In this method, I rank the loss consistently rank the top year over year as the top 5 reasons. I liste my  steps here :
+* group the data by year 
+* use mutate() to give each value a score 
+* ungroup the dataset
+* regroup it by loss
+* use summarize() to obtain the median of each loss 
+* use min_rank() to find out the top 5 
+
+
+
+
+
+```{r error=FALSE,message=FALSE}
+
+
+load(file="brazil_loss.Rdata")
+
+
+brazilloss3 <- gather(brazil_loss ,key="loss",value="value",4:14)
+
+top5 <- brazil_loss  %>% 
+  gather(key="loss",value="value",4:14) %>%
+  group_by(year) %>%
+  mutate(rank=min_rank(value)) %>%
+  ungroup %>%
+  group_by(loss) %>%
+  summarise(score=median(rank)) %>%
+  arrange(desc(score)) %>%
+  top_n(5)
+
+top5_data <- semi_join(brazilloss3,top5,by="loss")
+
+```
+
+## step 2, Including Plots
+
+I can also embed plots using ggplot2 and ggdark 
+
+```{r }
+
+top5_data %>%
+ggplot(mapping=aes(x=year,y=value))+
+  geom_line(mapping=aes(color=loss))+
+  geom_point(aes(alpha=0.1),position="jitter") +
+  
+  labs( title="Brazil forest loss year vs value",
+        subtitle="Illustrated below are the top 5 reasons of Brazil forest loss from 2001-2013",
+        caption ="data @ourworldindata graph@sky013088"
+  )+
+  
+  annotate("text",x=2006,y=2e+06,label="Pasture causes the most loss")+
+  theme(legend.position="bottom")+
+  theme_dark()
+
+```
