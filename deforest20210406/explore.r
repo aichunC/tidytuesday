@@ -80,7 +80,7 @@ brazil_loss %>%
      )+
   
    annotate("text",x=2005,y=2e+06,label="forest loss is declining")+
-  theme(legend.position="bottom")+
+     theme(legend.position="bottom")+
    theme_dark()
 # arrage the data to get the top_5 reasons for the forest loss in brazil 
 
@@ -111,5 +111,29 @@ ggplot(mapping=aes(x=year,y=value))+
   theme(legend.position="bottom")+
   theme_dark()
 
+############################## build a model 
+world2<-tibble(entity="World")
+forest2<-left_join(forest_area,forest,by=c("entity","year")) %>%
+  select(entity,year, forest_area,net_forest_conversion) %>%
+    drop_na() 
+
+
+ forest2 <- anti_join(forest2,world2,by="entity")  # delete the entity world 
+
+#add models to tibble 
+models2<-forest2 %>%
+  group_by(entity) %>%
+  nest() %>% # a tilbbel of 132x2
+  mutate(models=map(data,~lm(forest_area~net_forest_conversion,data=.x)))
+
+#add coeff to tibble  
+coeff2 <-models2 %>%
+  mutate(coeffs=map_dbl(models,  ~coefficients(.x) %>% pluck("(Intercept)")))
+
+#add r square to tibble 
+rsquare2 <-coeff2 %>%
+  mutate(rsquared=map_dbl(models,  ~summary(.x) %>% pluck("r.squared")))
+  
+  
 
 
