@@ -1,0 +1,89 @@
+---
+title: "Internet Usage in USA"
+author: '@Sky013088'
+date: "5/11/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(modelr)
+library(tidycensus) 
+library(sf)
+library(viridis)
+library(patchwork)
+#theme_set(silgelib::theme_plex())
+
+#census_api_key("15980bfd323da5c4a0975f213b6d68950cb177b8",install=TRUE)
+
+load("broadband.rdata")
+load("broadband_zip.rdata")
+
+knitr::opts_chunk$set(echo = TRUE)
+
+
+```
+
+## Internet Access Data Exploring 
+```{r}
+#get data from census dataset 
+ca_income <- get_acs(geography = "county", variables = "B19013_001",
+                 state = "CA", geometry = TRUE)
+
+```
+
+```{r }
+#clear dataset to get CA data
+
+
+tolower<-broadband %>% mutate(`COUNTY NAME`=tolower(`COUNTY NAME`))
+tonum<-tolower %>% mutate(`BROADBAND USAGE`=as.numeric(`BROADBAND USAGE`)) 
+
+
+names(tonum)=c("state","GEOID","region","broadband_fcc","usage")
+ ca_usage<-tonum %>% filter(state=="CA")%>% separate(col=region,into=c("subregion","county"),sep=-7) %>% select(-county)
+
+ca_usage<-ca_usage %>% mutate(GEOID=map(GEOID, ~paste("0",.x,sep="") )) %>% unnest(cols=c(GEOID))
+
+```
+
+```{r}
+# draw a map of the usage in the usa 
+# many county has no internet access ?? or something wrong ?
+
+county=map_data("county")
+ggplot(tonum,aes(fill=usage))+
+geom_map(map=county, aes(map_id=subregion))+
+expand_limits(x=county$long,y=county$lat)
+```
+
+```{r}
+# check to see how many county do not have lat and long in the county map. (121)
+
+
+dat_join <- ca_income %>% left_join(ca_usage, by="GEOID")
+```
+
+
+
+```{r}
+
+
+ dat_join%>%
+ st_as_sf()%>%
+ ggplot(aes(fill=usage,color=usage))+
+ geom_sf()+
+coord_sf()+
+ scale_fill_viridis()+
+ scale_color_viridis()+
+theme(legend.position = "none")
+
+```
+
+
+
+
+## Conclusion (Evaluate Model+Explore important variables)
+
+
+
