@@ -1,0 +1,92 @@
+---
+title: "survey"
+author: '@Sky013088'
+date: "5/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(modelr)
+library(forcats)
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introduction 
+
+This survey data is from a specific group (very white and very female) from ** Ask a Manager Survey**. It does not necessary reflect the general demographic populations. 
+
+## Exploring dataset survey
+
+```{r }
+load("survey.rdata")
+summary(survey)
+```
+
+```{r}
+# modify the race column
+survey$race <- factor(survey$race, levels=unique(survey$race))
+
+survey2<-survey%>% 
+  mutate(race=fct_lump(race, n=15) )%>% 
+  mutate(race=fct_collapse(race,
+  White=c("White", "White, Another option not listed here or prefer not to answer"),
+  Asian=c("Asian or Asian American", "Asian or Asian American, White","Asian or Asian American, Another option not listed here or prefer not to answer","Asian or Asian American, Another option not listed here or prefer not to answer","Asian or Asian American, Hispanic, Latino, or Spanish origin, White","Asian or Asian American, Hispanic, Latino, or Spanish origin, White","Asian or Asian American, Hispanic, Latino, or Spanish origin"),
+  Black=c("Black or African American", "Black or African American, Hispanic, Latino, or Spanish origin","Black or African American, White"),
+  Hispanic=c("Hispanic, Latino, or Spanish origin", "Hispanic, Latino, or Spanish origin, White"),
+  Other=c("Another option not listed here or prefer not to answer"),
+  Middle_East=c("Middle Eastern or Northern African, White", "Middle Eastern or Northern African"),
+  Native=c("Native American or Alaska Native, White", 
+           "Native American or Alaska Native")
+  
+))
+```
+
+```{r}
+#modify the timestap col, all recorded at 2021, month April or May, 
+# at 21 different days 
+
+survey3 <-survey2 %>%
+ separate(timestamp, into = c("date","time"),sep=" ") %>% select(-time)%>%
+ separate(date, into = c("month","day","year"),sep="/")
+
+```
+
+
+```{r}
+
+# this results show PHD students earned the highest salary, high school 
+# student earned the least.
+
+survey$highest_level_of_education_complated <-factor(survey$highest_level_of_education_completed, unique(survey$highest_level_of_education_completed))
+
+
+survey %>% group_by(highest_level_of_education_completed) %>% summarize(salary=mean(annual_salary,na.rm=TRUE)) %>%
+  mutate(highest_level_of_education_completed=reorder(highest_level_of_education_completed,salary)) %>% 
+drop_na() %>%
+ ggplot()+
+ geom_point(aes(x=highest_level_of_education_completed,y=salary))
+
+```
+
+
+## Linear model
+
+survey4<-survey3[-which(survey3$annual_salary==102000000),] %>% filter(currency=="USD", gender=="Man"|gender=="Woman") 
+
+grid <- survey4 %>%data_grid(gender,.model=mod) %>%
+add_predictions(mod)
+
+
+survey4%>%
+ggplot()+
+geom_violin(aes(x=gender,y=annual_salary))+
+geom_point(data=grid,aes(x=gender,y=pred,color="red"))+
+coord_cartesian(ylim=c(0,1.5e+06))+
+labs(
+title="Prediction of Man and Woman annual salary",
+subtitle="Man have less variance but higher salary than woman",
+caption="data from Ask a Manager survey,graph@sky32456985")
+
+
+
+
