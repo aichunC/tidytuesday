@@ -1,0 +1,147 @@
+---
+title: "week21_drivers"
+author: '@Sky013088'
+date: "5/26/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(modelr)
+library(lubridate)
+
+
+
+```
+
+## Load data 
+save(drivers,file= "drivers.rdata")
+save(records,file= "records.rdata")
+
+load(drivers)
+load(records)
+
+## Data Exploring
+
+```{r}
+
+records %>% ggplot()+
+  geom_point(aes(x=date, y=time, color=track)) +
+  facet_grid(cols=vars(shortcut), rows=vars(type))
+
+```
+
+
+```{r}
+#Who is the player with the most world records?
+drivers %>% group_by(player)%>%summarize(max=max(total)) %>% arrange(desc(max))
+```
+
+```{r}
+# who are the most recent players?
+
+drivers %>% filter(year==2021)
+
+```
+
+```{r}
+#Which is the longest standing world record?
+records %>% filter(record_duration=max(record_duration))
+```
+
+```{r}
+#On which track does the shortcut save the most time?
+records %>% filter(shortcut=="Yes") %>% group_by(track) %>% summarise(n=n()) %>% arrange(desc(n))
+```
+
+```{r}
+# when was shortcut discovered ?
+records %>% filter(shortcut=="Yes") %>% arrange(date)
+```
+
+```{r}
+#For how many tracks have shortcuts been discovered?
+
+records %>% filter(shortcut=="Yes") %>% summarize(u=unique(track))
+```
+
+```{r}
+#which track is the fastest? min time
+
+records %>% filter(time==min(time))
+```
+
+```{r}
+#for what track did the world record imporve the most ?
+
+records %>%group_by(track) %>%summarise(i=max(record_duration)-min(record_duration)) %>% arrange(desc(i))
+```
+
+# build a model
+```{r}
+library(tidymodels)
+
+# before we do model, always split the dataset into two parts: training and #testing 
+set.seed(123)
+mario_split <- records %>% 
+  select(shortcut, track, type, date, time) %>%
+  mutate_if(is.character,factor) %>%
+  initial_split(strata=shortcut)
+
+mario_train <- training(mario_split)
+mario_test <- testing(mario_split)
+
+# reampling of the training dataset, 
+set.seed(234)
+mario_fold <- bootstrap(mario_train, strata=time)
+
+
+```
+
+```{r}
+# tune the dataset, 
+tree_spec <- decision_tree(
+  cost_complexity = tune(),
+  tree_depth = tune()
+  
+) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+tree_grid <- grid_regular(cost_complexity(),tree_depth(),levels=7 )
+
+mario_wf <- workflow() %>%
+  add_model(tree_spec) %>%
+  add_formula(shortcut ~.)
+ 
+mario_wf 
+```
+
+
+```{r}
+# do paralel comuting to speed up the testing and access process 
+# 49 models 
+doParallel:: registerDoPaarllel()
+
+tree_res <- tune_grid(
+  
+  mario_wf,
+  resample = mario_fold,
+  grid=tree_grid,
+  control=control_grid(save_pred = TRUE)
+)
+
+```
+
+```{r}
+# choose the best model and show a plot 
+collect_metrics(tree_res)
+show_best(tree_res,metric="roc_auc")
+autoplot(tree_res)
+```
+
+
+
+
